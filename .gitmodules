@@ -1,0 +1,3 @@
+[submodule "lib/avr-serial-cpp"]
+	path = lib/avr-serial-cpp
+	url = git@github.com:aedalzotto/avr-serial-cpp.git
