@@ -1,5 +1,4 @@
 #include <URM37.h>
-#include <Serial.h>
 
 #if F_CPU == 16000000UL
     const uint8_t URM37::divider = 2;
@@ -14,55 +13,55 @@ volatile uint16_t URM37::then;
 volatile bool URM37::edge;
 
 // CHANGE TO COMP based on the divider
-ISR(TIMER1_OVF_vect)
+ISR(OVF_VECT)
 {
-    TCCR1B &= ~(1 << CS11); // Disable timer
+    TMR_RB &= ~(1 << TMR_CS8); // Disable timer
     URM37::distance = -2;
 }
 
-ISR(TIMER1_CAPT_vect)
+ISR(ICP_VECT)
 {
     if(URM37::edge){
-        TCCR1B &= ~(1 << CS11); // Disable timer
+        TMR_RB &= ~(1 << TMR_CS8); // Disable timer
         
-        URM37::distance = (ICR1 - URM37::then) / URM37::divider / 50;
+        URM37::distance = (ICP_CNT - URM37::then) / URM37::divider / 50;
         if(URM37::distance > 204) URM37::distance = -2;
     } else {
-        TCCR1B |= (1 << ICES1); // Rising Edge
-        URM37::then = ICR1;
+        TMR_RB |= (1 << ICP_EDG); // Rising Edge
+        URM37::then = ICP_CNT;
         URM37::edge = true;
     }
 }
 
 void URM37::init()
 {
-    DDRB &= ~(1 << PB0); // ICP1 Input
-    DDRB |= (1 << PB1);  // Trigger output
-    PORTB |= (1 << PB1); // Trigger high
+    ICP_DDR &= ~(1 << ICP_PIN); // ICP1 Input
+    TRIGGER_DDR |= (1 << TRIGGER_PIN);  // Trigger output
+    TRIGGER_PORT |= (1 << TRIGGER_PIN); // Trigger high
     distance = -2; // -2 means need retrigger
     then = 0;
     edge = false;
 
-    TCNT1 = 0; // Zero the timer;
-    TCCR1B |= (1 << ICES1); // Rising Edge to avoid unexpected interruption
+    TMR_CNT = 0; // Zero the timer;
+    TMR_RB |= (1 << ICP_EDG); // Rising Edge to avoid unexpected interruption
 
-    TIFR1 &= ~((1 << ICF1) | (1 << TOV1)); // Clear flags
-    TIMSK1 |= (1 << ICIE1) | (1 << TOIE1); // Enable ICP int and COMPA int
+    TMR_FLG &= ~((1 << ICP_FLG) | (1 << OVF_FLG)); // Clear flags
+    TMR_INT |= (1 << ICP_INT) | (1 << OVF_INT); // Enable ICP int and COMPA int
 }
 
 void URM37::trigger()
 {
     distance = -1; // -1 means polling
-    TCNT1 = 0;
-    TCCR1B &= ~(1 << ICES1); // Falling edge
+    TMR_CNT = 0;
+    TMR_RB &= ~(1 << ICP_EDG); // Falling edge
     edge = false;
 
     // Low pulse triggers
-    PORTB &= ~(1 << PB1);
+    TRIGGER_PORT &= ~(1 << TRIGGER_PIN);
     _delay_us(5);   // Sync to a digitalWrite() timing
-    PORTB |= (1 << PB1);
+    TRIGGER_PORT |= (1 << TRIGGER_PIN);
 
-    TCCR1B |= (1 << CS11); // Enable timer
+    TMR_RB |= (1 << TMR_CS8); // Enable timer with /8 prescaler
 }
 
 int16_t URM37::get_distance()
